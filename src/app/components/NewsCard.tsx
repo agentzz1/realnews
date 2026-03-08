@@ -21,7 +21,7 @@ export interface NewsItem {
 const statusConfig: Record<FactStatus, { label: string; icon: string; class: string }> = {
     verified: { label: "Verified", icon: "✓", class: "badge-verified" },
     misleading: { label: "Misleading", icon: "⚠", class: "badge-misleading" },
-    false: { label: "False", icon: "✕", class: "badge-false" },
+    false: { label: "Likely false", icon: "✕", class: "badge-false" },
     unverified: { label: "Unverified", icon: "?", class: "badge-unverified" },
 };
 

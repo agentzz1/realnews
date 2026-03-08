@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
-import { fetchLatestNews, RawArticle } from '@/app/lib/rssFetcher';
-import { checkFactWithGemini } from '@/app/lib/gemini';
-import { supabase } from '@/app/lib/supabase';
-import { NewsItem } from '@/app/components/NewsCard';
+import { NextResponse } from "next/server";
+import { fetchLatestNews } from "@/app/lib/rssFetcher";
+import { GeminiServiceError, checkFactWithGemini } from "@/app/lib/gemini";
+import { supabase } from "@/app/lib/supabase";
+import { NewsItem } from "@/app/components/NewsCard";
 
 // Helper to delay execution (rate limiting)
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -13,9 +13,9 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function POST(request: Request) {
     try {
         // SECURITY: Ensure this is only called by our trusted cron job or with a secret
-        const authHeader = request.headers.get('authorization');
+        const authHeader = request.headers.get("authorization");
         if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         // STEP 1: Fetch trending/breaking news from Free RSS Feeds
@@ -34,20 +34,28 @@ export async function POST(request: Request) {
         for (const article of articlesToProcess) {
             console.log(`Checking: ${article.title.substring(0, 40)}...`);
 
-            const factCheck = await checkFactWithGemini(article.title, article.summary);
+            try {
+                const factCheck = await checkFactWithGemini(article.title, article.summary);
 
-            factCheckedNews.push({
-                title: article.title,
-                summary: article.summary,
-                source: article.source,
-                sourceUrl: article.link,
-                category: "World News", // Default category for now
-                publishedAt: article.pubDate,
-                factStatus: factCheck.factStatus,
-                confidence: factCheck.confidence,
-                factCheckSummary: factCheck.factCheckSummary,
-                sources: [article.source], // Could be enriched by LLM later
-            });
+                factCheckedNews.push({
+                    title: article.title,
+                    summary: article.summary,
+                    source: article.source,
+                    sourceUrl: article.link,
+                    category: "World News", // Default category for now
+                    publishedAt: article.pubDate,
+                    factStatus: factCheck.factStatus,
+                    confidence: factCheck.confidence,
+                    factCheckSummary: factCheck.factCheckSummary,
+                    sources: [article.source], // Could be enriched by LLM later
+                });
+            } catch (error) {
+                if (error instanceof GeminiServiceError) {
+                    console.error("Skipping article due to Gemini availability issue:", error);
+                } else {
+                    console.error("Skipping article due to unexpected Gemini error:", error);
+                }
+            }
 
             // RATE LIMITING: Wait 4.5 seconds between requests (Max ~13 requests per minute)
             // This guarantees we never hit the 15 RPM free tier limit.
@@ -59,13 +67,15 @@ export async function POST(request: Request) {
         console.log("Saving to database...");
 
         // Ensure we don't insert if missing Supabase keys
-        if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
-            const { error } = await supabase.from('news').insert(factCheckedNews);
+        if (process.env.NEXT_PUBLIC_SUPABASE_URL && factCheckedNews.length > 0) {
+            const { error } = await supabase.from("news").insert(factCheckedNews);
             if (error) {
                 console.error("Supabase insert error:", error);
             } else {
                 console.log("Successfully saved to Supabase.");
             }
+        } else if (factCheckedNews.length === 0) {
+            console.warn("Skipping DB save: no successful Gemini analyses were produced.");
         } else {
             console.warn("Skipping DB save: Supabase keys not found in .env.local");
         }
@@ -77,6 +87,6 @@ export async function POST(request: Request) {
         });
     } catch (error) {
         console.error("Cron update failed:", error);
-        return NextResponse.json({ success: false, error: 'Update failed' }, { status: 500 });
+        return NextResponse.json({ success: false, error: "Update failed" }, { status: 500 });
     }
 }

@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RealNews.tech
 
-## Getting Started
+RealNews.tech is a Next.js MVP for AI-assisted credibility checks. Users can paste a headline, claim, or link and receive a structured verdict with reasoning and suggested sources.
 
-First, run the development server:
+## Local Development
+
+Install dependencies and start the dev server:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Use `http://localhost:3000` for local testing.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Required environment variables in `.env.local`:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+GEMINI_API_KEY=your_key_here
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+CRON_SECRET=your_cron_secret
+```
 
-## Learn More
+Optional environment variables:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+GEMINI_MODEL=gemini-2.5-flash
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Troubleshooting
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- If the homepage shows that live checks are unavailable because the app server is not responding, confirm you opened the app on `http://localhost:3000`.
+- If you open a stale local port such as `http://localhost:3001` while this app is only running on `3000`, same-origin requests to `/api/check` will fail before they reach the Next.js route.
+- If live AI checks are temporarily unavailable, the Gemini API may be rate-limited or unavailable. The UI will keep the demo state visible and prompt you to retry.
 
-## Deploy on Vercel
+## Verification
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Use the production build to validate the app before deploy:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run build
+```
