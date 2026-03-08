@@ -42,6 +42,18 @@ type LiveAnalysis = {
     modelUsed: string;
 };
 
+type GeminiAvailability = {
+    allowGemini: boolean;
+    dailyLimitReached: boolean;
+};
+
+type SupabaseWriteError = {
+    code?: string;
+    details?: string | null;
+    hint?: string | null;
+    message?: string;
+};
+
 function getDailyCheckLimit(): number {
     const rawLimit = Number.parseInt(
         process.env.DAILY_CHECK_LIMIT ?? `${DEFAULT_DAILY_CHECK_LIMIT}`,
@@ -118,6 +130,21 @@ function isStaleTechnicalFailure(record: Partial<StoredCheckRecord> | null | und
     );
 }
 
+function isMistralFallbackRecord(
+    record: Partial<StoredCheckRecord> | null | undefined
+) {
+    return (record?.model_used ?? "").toLowerCase().includes("mistral");
+}
+
+function isSupabaseRlsWriteError(error: unknown): error is SupabaseWriteError {
+    return (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error as { code?: unknown }).code === "42501"
+    );
+}
+
 function mapGeminiErrorToResponse(error: GeminiServiceError) {
     if (error.code === "gemini_quota_exceeded") {
         return createErrorResponse(
@@ -185,6 +212,89 @@ async function runLiveAnalysis(text: string, allowGemini: boolean): Promise<Live
     throw new MistralServiceError("Mistral fallback is not configured.", 503, false);
 }
 
+async function getGeminiAvailability(): Promise<GeminiAvailability> {
+    const dailyCheckLimit = getDailyCheckLimit();
+
+    if (dailyCheckLimit === 0) {
+        return {
+            allowGemini: false,
+            dailyLimitReached: true,
+        };
+    }
+
+    const { count: dailyFreshChecks, error: dailyCountError } = await supabase
+        .from("checks")
+        .select("id", { count: "exact", head: true })
+        .eq("model_used", GEMINI_MODEL)
+        .gte("created_at", getUtcDayStartIso());
+
+    if (dailyCountError) {
+        console.error("Supabase Daily Limit Lookup Error:", dailyCountError);
+        return {
+            allowGemini: true,
+            dailyLimitReached: false,
+        };
+    }
+
+    const dailyLimitReached = (dailyFreshChecks ?? 0) >= dailyCheckLimit;
+
+    if (dailyLimitReached) {
+        console.warn(
+            `Daily Gemini free-tier limit reached: ${dailyFreshChecks}/${dailyCheckLimit}`
+        );
+    }
+
+    return {
+        allowGemini: !dailyLimitReached,
+        dailyLimitReached,
+    };
+}
+
+function createResponseData(
+    text: string,
+    aiResult: DetailedFactCheckResult,
+    modelUsed: string
+) {
+    return {
+        id: crypto.randomUUID(),
+        input_text: text,
+        verdict: aiResult.verdict,
+        confidence: aiResult.confidence,
+        summary: aiResult.summary,
+        why_reasoning: aiResult.why_reasoning,
+        sources: aiResult.sources,
+        model_used: modelUsed,
+        created_at: new Date().toISOString(),
+    };
+}
+
+async function saveCheckResult(
+    inputHash: string,
+    text: string,
+    aiResult: DetailedFactCheckResult,
+    modelUsed: string
+) {
+    const insertPayload = {
+        input_text: text,
+        input_hash: inputHash,
+        input_type: normalizeInputForHash(text).startsWith("http") ? "url" : "headline",
+        verdict: aiResult.verdict,
+        confidence: aiResult.confidence,
+        summary: aiResult.summary,
+        why_reasoning: aiResult.why_reasoning,
+        sources: aiResult.sources,
+        model_used: modelUsed,
+    };
+
+    return await supabase
+        .from("checks")
+        .upsert(insertPayload, { onConflict: "input_hash" })
+        .select(
+            "id, input_text, verdict, confidence, summary, why_reasoning, sources, model_used, created_at"
+        )
+        .single<StoredCheckRecord>();
+}
+
 export async function POST(request: Request) {
     try {
         let body: { text?: unknown };
@@ -231,60 +341,97 @@ export async function POST(request: Request) {
             .eq("input_hash", inputHash)
             .maybeSingle<StoredCheckRecord>();
 
+        const hasUsableCache = Boolean(cachedCheck) && !isStaleTechnicalFailure(cachedCheck);
+        const hasFallbackCache = hasUsableCache && isMistralFallbackRecord(cachedCheck);
+
         if (cacheError) {
             console.error("Supabase Cache Lookup Error:", cacheError);
-        } else if (cachedCheck && !isStaleTechnicalFailure(cachedCheck)) {
+        } else if (hasUsableCache && !hasFallbackCache) {
             console.log("CACHE HIT! Returning instant result from Supabase.");
             return NextResponse.json({
                 success: true,
                 cached: true,
                 data: cachedCheck,
             });
+        } else if (hasFallbackCache) {
+            console.log(
+                "Fallback cache hit found. Will try to upgrade it with Gemini if quota allows."
+            );
         } else if (cachedCheck) {
             console.warn(`Ignoring stale technical failure cache row: ${cachedCheck.id}`);
         }
 
-        const dailyCheckLimit = getDailyCheckLimit();
         const mistralConfigured = isMistralConfigured();
-        let allowGemini = true;
+        const geminiAvailability = await getGeminiAvailability();
+        const allowGemini = geminiAvailability.allowGemini;
 
-        if (dailyCheckLimit === 0) {
-            if (!mistralConfigured) {
-                return createErrorResponse(
-                    429,
-                    "daily_limit_reached",
-                    "Daily free quota reached. Try again tomorrow.",
-                    false
-                );
-            }
-
-            allowGemini = false;
+        if (!allowGemini && hasFallbackCache) {
+            console.log("Keeping cached fallback because Gemini daily quota is still exhausted.");
+            return NextResponse.json({
+                success: true,
+                cached: true,
+                data: cachedCheck,
+            });
         }
 
-        if (allowGemini) {
-            const { count: dailyFreshChecks, error: dailyCountError } = await supabase
-                .from("checks")
-                .select("id", { count: "exact", head: true })
-                .eq("model_used", GEMINI_MODEL)
-                .gte("created_at", getUtcDayStartIso());
+        if (!allowGemini && !mistralConfigured) {
+            return createErrorResponse(
+                429,
+                "daily_limit_reached",
+                "Daily free quota reached. Try again tomorrow.",
+                false
+            );
+        }
 
-            if (dailyCountError) {
-                console.error("Supabase Daily Limit Lookup Error:", dailyCountError);
-            } else if ((dailyFreshChecks ?? 0) >= dailyCheckLimit) {
-                console.warn(
-                    `Daily Gemini free-tier limit reached: ${dailyFreshChecks}/${dailyCheckLimit}`
+        if (hasFallbackCache && allowGemini) {
+            try {
+                console.log("Attempting to refresh cached fallback with Gemini verification.");
+                const aiResult = await checkFactWithGeminiDetailed(text);
+                const responseData = createResponseData(text, aiResult, GEMINI_MODEL);
+                const { data: savedCheck, error: saveError } = await saveCheckResult(
+                    inputHash,
+                    text,
+                    aiResult,
+                    GEMINI_MODEL
                 );
 
-                if (!mistralConfigured) {
-                    return createErrorResponse(
-                        429,
-                        "daily_limit_reached",
-                        "Daily free quota reached. Try again tomorrow.",
-                        false
-                    );
+                if (saveError) {
+                    if (isSupabaseRlsWriteError(saveError)) {
+                        console.warn(
+                            "Could not replace cached fallback row because the current Supabase policy blocks updates. Returning the fresh Gemini result without cache refresh."
+                        );
+                    } else {
+                        console.error(
+                            "Supabase Upsert Error while upgrading fallback:",
+                            saveError
+                        );
+                    }
+                    return NextResponse.json({
+                        success: true,
+                        cached: false,
+                        data: responseData,
+                    });
                 }
 
-                allowGemini = false;
+                console.log("Fallback cache upgraded to Gemini verification.");
+                return NextResponse.json({
+                    success: true,
+                    cached: false,
+                    data: savedCheck,
+                });
+            } catch (error) {
+                if (error instanceof GeminiServiceError) {
+                    console.warn(
+                        `Gemini refresh failed (${error.code}). Returning cached fallback instead.`
+                    );
+                    return NextResponse.json({
+                        success: true,
+                        cached: true,
+                        data: cachedCheck,
+                    });
+                }
+
+                throw error;
             }
         }
 
@@ -294,40 +441,16 @@ export async function POST(request: Request) {
                 : "CACHE MISS. Using Mistral fallback analysis mode..."
         );
         const { aiResult, modelUsed } = await runLiveAnalysis(text, allowGemini);
-        const responseData = {
-            id: crypto.randomUUID(),
-            input_text: text,
-            verdict: aiResult.verdict,
-            confidence: aiResult.confidence,
-            summary: aiResult.summary,
-            why_reasoning: aiResult.why_reasoning,
-            sources: aiResult.sources,
-            model_used: modelUsed,
-            created_at: new Date().toISOString(),
-        };
-
-        const insertPayload = {
-            input_text: text,
-            input_hash: inputHash,
-            input_type: normalizeInputForHash(text).startsWith("http") ? "url" : "headline",
-            verdict: aiResult.verdict,
-            confidence: aiResult.confidence,
-            summary: aiResult.summary,
-            why_reasoning: aiResult.why_reasoning,
-            sources: aiResult.sources,
-            model_used: modelUsed,
-        };
-
-        const { data: insertedCheck, error: insertError } = await supabase
-            .from("checks")
-            .insert(insertPayload)
-            .select(
-                "id, input_text, verdict, confidence, summary, why_reasoning, sources, model_used, created_at"
-            )
-            .single<StoredCheckRecord>();
+        const responseData = createResponseData(text, aiResult, modelUsed);
+        const { data: insertedCheck, error: insertError } = await saveCheckResult(
+            inputHash,
+            text,
+            aiResult,
+            modelUsed
+        );
 
         if (insertError) {
-            console.error("Supabase Insert Error:", insertError);
+            console.error("Supabase Upsert Error:", insertError);
             return NextResponse.json({
                 success: true,
                 cached: false,
