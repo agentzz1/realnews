@@ -3,9 +3,16 @@ import crypto from "crypto";
 import { supabase } from "@/app/lib/supabase";
 import {
     GEMINI_MODEL,
+    type DetailedFactCheckResult,
     GeminiServiceError,
     checkFactWithGeminiDetailed,
 } from "@/app/lib/gemini";
+import {
+    MISTRAL_MODEL,
+    MistralServiceError,
+    checkFactWithMistralDetailed,
+    isMistralConfigured,
+} from "@/app/lib/mistral";
 
 const TECHNICAL_FAILURE_SUMMARY = "Analysis failed due to a technical error.";
 const DEFAULT_DAILY_CHECK_LIMIT = 12;
@@ -26,7 +33,13 @@ type StoredCheckRecord = {
     summary: string;
     why_reasoning: string[];
     sources: { title: string; url: string }[];
+    model_used?: string;
     created_at: string;
+};
+
+type LiveAnalysis = {
+    aiResult: DetailedFactCheckResult;
+    modelUsed: string;
 };
 
 function getDailyCheckLimit(): number {
@@ -123,6 +136,55 @@ function mapGeminiErrorToResponse(error: GeminiServiceError) {
     );
 }
 
+function mapMistralErrorToResponse(error: MistralServiceError) {
+    return createErrorResponse(
+        error.status === 429 ? 429 : 503,
+        "provider_unavailable",
+        "Fallback analysis is temporarily unavailable. Please retry in a moment.",
+        error.retryable
+    );
+}
+
+async function runLiveAnalysis(text: string, allowGemini: boolean): Promise<LiveAnalysis> {
+    let lastGeminiError: GeminiServiceError | null = null;
+
+    if (allowGemini) {
+        try {
+            const aiResult = await checkFactWithGeminiDetailed(text);
+            return {
+                aiResult,
+                modelUsed: GEMINI_MODEL,
+            };
+        } catch (error) {
+            if (error instanceof GeminiServiceError) {
+                lastGeminiError = error;
+                console.warn(
+                    `Gemini live verification failed (${error.code}).` +
+                        (isMistralConfigured()
+                            ? " Falling back to Mistral analysis mode."
+                            : "")
+                );
+            } else {
+                throw error;
+            }
+        }
+    }
+
+    if (isMistralConfigured()) {
+        const aiResult = await checkFactWithMistralDetailed(text);
+        return {
+            aiResult,
+            modelUsed: MISTRAL_MODEL,
+        };
+    }
+
+    if (lastGeminiError) {
+        throw lastGeminiError;
+    }
+
+    throw new MistralServiceError("Mistral fallback is not configured.", 503, false);
+}
+
 export async function POST(request: Request) {
     try {
         let body: { text?: unknown };
@@ -163,7 +225,9 @@ export async function POST(request: Request) {
 
         const { data: cachedCheck, error: cacheError } = await supabase
             .from("checks")
-            .select("id, input_text, verdict, confidence, summary, why_reasoning, sources, created_at")
+            .select(
+                "id, input_text, verdict, confidence, summary, why_reasoning, sources, model_used, created_at"
+            )
             .eq("input_hash", inputHash)
             .maybeSingle<StoredCheckRecord>();
 
@@ -181,37 +245,55 @@ export async function POST(request: Request) {
         }
 
         const dailyCheckLimit = getDailyCheckLimit();
+        const mistralConfigured = isMistralConfigured();
+        let allowGemini = true;
 
         if (dailyCheckLimit === 0) {
-            return createErrorResponse(
-                429,
-                "daily_limit_reached",
-                "Daily free quota reached. Try again tomorrow.",
-                false
-            );
+            if (!mistralConfigured) {
+                return createErrorResponse(
+                    429,
+                    "daily_limit_reached",
+                    "Daily free quota reached. Try again tomorrow.",
+                    false
+                );
+            }
+
+            allowGemini = false;
         }
 
-        const { count: dailyFreshChecks, error: dailyCountError } = await supabase
-            .from("checks")
-            .select("id", { count: "exact", head: true })
-            .gte("created_at", getUtcDayStartIso());
+        if (allowGemini) {
+            const { count: dailyFreshChecks, error: dailyCountError } = await supabase
+                .from("checks")
+                .select("id", { count: "exact", head: true })
+                .eq("model_used", GEMINI_MODEL)
+                .gte("created_at", getUtcDayStartIso());
 
-        if (dailyCountError) {
-            console.error("Supabase Daily Limit Lookup Error:", dailyCountError);
-        } else if ((dailyFreshChecks ?? 0) >= dailyCheckLimit) {
-            console.warn(
-                `Daily free-tier limit reached: ${dailyFreshChecks}/${dailyCheckLimit}`
-            );
-            return createErrorResponse(
-                429,
-                "daily_limit_reached",
-                "Daily free quota reached. Try again tomorrow.",
-                false
-            );
+            if (dailyCountError) {
+                console.error("Supabase Daily Limit Lookup Error:", dailyCountError);
+            } else if ((dailyFreshChecks ?? 0) >= dailyCheckLimit) {
+                console.warn(
+                    `Daily Gemini free-tier limit reached: ${dailyFreshChecks}/${dailyCheckLimit}`
+                );
+
+                if (!mistralConfigured) {
+                    return createErrorResponse(
+                        429,
+                        "daily_limit_reached",
+                        "Daily free quota reached. Try again tomorrow.",
+                        false
+                    );
+                }
+
+                allowGemini = false;
+            }
         }
 
-        console.log("CACHE MISS. Asking Gemini Analysis...");
-        const aiResult = await checkFactWithGeminiDetailed(text);
+        console.log(
+            allowGemini
+                ? "CACHE MISS. Asking Gemini for live verification..."
+                : "CACHE MISS. Using Mistral fallback analysis mode..."
+        );
+        const { aiResult, modelUsed } = await runLiveAnalysis(text, allowGemini);
         const responseData = {
             id: crypto.randomUUID(),
             input_text: text,
@@ -220,6 +302,7 @@ export async function POST(request: Request) {
             summary: aiResult.summary,
             why_reasoning: aiResult.why_reasoning,
             sources: aiResult.sources,
+            model_used: modelUsed,
             created_at: new Date().toISOString(),
         };
 
@@ -232,13 +315,15 @@ export async function POST(request: Request) {
             summary: aiResult.summary,
             why_reasoning: aiResult.why_reasoning,
             sources: aiResult.sources,
-            model_used: GEMINI_MODEL,
+            model_used: modelUsed,
         };
 
         const { data: insertedCheck, error: insertError } = await supabase
             .from("checks")
             .insert(insertPayload)
-            .select("id, input_text, verdict, confidence, summary, why_reasoning, sources, created_at")
+            .select(
+                "id, input_text, verdict, confidence, summary, why_reasoning, sources, model_used, created_at"
+            )
             .single<StoredCheckRecord>();
 
         if (insertError) {
@@ -260,6 +345,11 @@ export async function POST(request: Request) {
         if (error instanceof GeminiServiceError) {
             console.error("API /check Gemini Error:", error);
             return mapGeminiErrorToResponse(error);
+        }
+
+        if (error instanceof MistralServiceError) {
+            console.error("API /check Mistral Error:", error);
+            return mapMistralErrorToResponse(error);
         }
 
         console.error("API /check Error:", error);
