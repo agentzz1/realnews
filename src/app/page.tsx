@@ -9,6 +9,15 @@ const NETWORK_ERROR_MESSAGE =
   "Live checks are unavailable because the app server on this origin is not responding.";
 const AI_UNAVAILABLE_MESSAGE =
   "Live AI checks are temporarily unavailable. Please retry in a moment.";
+const DAILY_LIMIT_MESSAGE = "Daily free quota reached. Try again tomorrow.";
+
+type FeedbackTone = "danger" | "warning";
+
+type InlineFeedback = {
+  message: string;
+  hint?: string;
+  tone: FeedbackTone;
+};
 
 type CheckApiSuccessResponse = {
   success: true;
@@ -19,7 +28,13 @@ type CheckApiSuccessResponse = {
 type CheckApiErrorResponse = {
   success: false;
   error: string;
-  errorCode: "invalid_input" | "input_too_long" | "quota_exceeded" | "provider_unavailable" | "internal_error";
+  errorCode:
+    | "invalid_input"
+    | "input_too_long"
+    | "daily_limit_reached"
+    | "quota_exceeded"
+    | "provider_unavailable"
+    | "internal_error";
   retryable: boolean;
 };
 
@@ -88,36 +103,75 @@ function isCheckApiSuccessResponse(value: unknown): value is CheckApiSuccessResp
   );
 }
 
-function mapApiErrorToMessage(response: CheckApiErrorResponse): string {
+function mapApiErrorToFeedback(response: CheckApiErrorResponse): InlineFeedback {
   switch (response.errorCode) {
     case "invalid_input":
     case "input_too_long":
-      return response.error;
+      return {
+        message: response.error,
+        tone: "danger",
+      };
+    case "daily_limit_reached":
+      return {
+        message: DAILY_LIMIT_MESSAGE,
+        hint: "Live AI is paused for today. You can still explore the example results below.",
+        tone: "warning",
+      };
     case "quota_exceeded":
+      return {
+        message: DAILY_LIMIT_MESSAGE,
+        hint: "Gemini free tier looks exhausted right now. The example results below still show how the product works.",
+        tone: "warning",
+      };
     case "provider_unavailable":
-      return AI_UNAVAILABLE_MESSAGE;
+      return {
+        message: AI_UNAVAILABLE_MESSAGE,
+        hint: "Live AI is down for the moment. You can still explore the example results below.",
+        tone: "warning",
+      };
     default:
-      return "Something went wrong while checking this claim. Please try again.";
+      return {
+        message: "Something went wrong while checking this claim. Please try again.",
+        tone: "danger",
+      };
   }
 }
 
-function mapRequestErrorToMessage(error: unknown): string {
+function mapRequestErrorToFeedback(error: unknown): InlineFeedback {
   if (error instanceof DOMException && error.name === "AbortError") {
-    return AI_UNAVAILABLE_MESSAGE;
+    return {
+      message: AI_UNAVAILABLE_MESSAGE,
+      hint: "The request timed out before Gemini responded. You can still explore the example results below.",
+      tone: "warning",
+    };
   }
 
   if (
     error instanceof TypeError ||
     (error instanceof Error && /failed to fetch|networkerror|load failed/i.test(error.message))
   ) {
-    return NETWORK_ERROR_MESSAGE;
+    return {
+      message: NETWORK_ERROR_MESSAGE,
+      hint: "Local tip: run the app on http://localhost:3000. A stale port or stopped dev server prevents /api/check from responding.",
+      tone: "danger",
+    };
   }
 
   if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
+    return {
+      message: error.message,
+      tone: error.message === DAILY_LIMIT_MESSAGE ? "warning" : "danger",
+      hint:
+        error.message === DAILY_LIMIT_MESSAGE
+          ? "Live AI is paused for today. You can still explore the example results below."
+          : undefined,
+    };
   }
 
-  return "Something went wrong while checking this claim. Please try again.";
+  return {
+    message: "Something went wrong while checking this claim. Please try again.",
+    tone: "danger",
+  };
 }
 
 async function parseCheckResponse(response: Response): Promise<CheckApiResponse | null> {
@@ -139,16 +193,17 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<CheckResult | null>(null);
   const [isCached, setIsCached] = useState(false);
-  const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState<InlineFeedback | null>(null);
 
   const handleCheck = async () => {
     if (!inputText.trim()) return;
 
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let apiErrorFeedback: InlineFeedback | null = null;
 
     setIsLoading(true);
-    setError("");
+    setFeedback(null);
     setResult(null);
     setIsCached(false);
 
@@ -164,7 +219,8 @@ export default function Home() {
 
       if (!response.ok) {
         if (payload && isCheckApiErrorResponse(payload)) {
-          throw new Error(mapApiErrorToMessage(payload));
+          apiErrorFeedback = mapApiErrorToFeedback(payload);
+          throw new Error(apiErrorFeedback.message);
         }
 
         throw new Error(
@@ -181,7 +237,7 @@ export default function Home() {
       setResult(payload.data);
       setIsCached(payload.cached);
     } catch (err: unknown) {
-      setError(mapRequestErrorToMessage(err));
+      setFeedback(apiErrorFeedback ?? mapRequestErrorToFeedback(err));
     } finally {
       window.clearTimeout(timeoutId);
       setIsLoading(false);
@@ -190,10 +246,20 @@ export default function Home() {
 
   const fillExample = (text: string) => {
     setInputText(text);
-    setError("");
+    setFeedback(null);
   };
-
-  const showLocalPortHint = error === NETWORK_ERROR_MESSAGE;
+  const feedbackClasses =
+    feedback?.tone === "warning"
+      ? "border-amber-500/20 bg-amber-500/10 shadow-amber-950/20"
+      : "border-red-500/20 bg-red-500/10 shadow-red-950/20";
+  const feedbackTextClasses =
+    feedback?.tone === "warning"
+      ? "text-amber-100"
+      : "text-red-200";
+  const feedbackHintClasses =
+    feedback?.tone === "warning"
+      ? "text-amber-100/70"
+      : "text-red-100/70";
 
   return (
     <div className="min-h-screen p-6 sm:p-10 font-[family-name:var(--font-geist-sans)] flex flex-col items-center">
@@ -262,12 +328,12 @@ export default function Home() {
                 </button>
               </div>
 
-              {error && (
-                <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-left shadow-lg shadow-red-950/20">
-                  <p className="text-sm font-medium text-red-200">{error}</p>
-                  {showLocalPortHint && (
-                    <p className="mt-2 text-xs text-red-100/70">
-                      Local tip: run the app on http://localhost:3000. A stale port or stopped dev server prevents /api/check from responding.
+              {feedback && (
+                <div className={`mt-4 rounded-2xl border px-4 py-3 text-left shadow-lg ${feedbackClasses}`}>
+                  <p className={`text-sm font-medium ${feedbackTextClasses}`}>{feedback.message}</p>
+                  {feedback.hint && (
+                    <p className={`mt-2 text-xs ${feedbackHintClasses}`}>
+                      {feedback.hint}
                     </p>
                   )}
                 </div>
