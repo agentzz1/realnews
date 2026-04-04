@@ -399,12 +399,12 @@ export default function Home() {
 
                   <div className="flex flex-col gap-6">
                     <div className="w-full min-h-[180px]">
-                      <NewsCard item={DEMO_CARDS[0]} index={0} />
+                      <NewsCard item={DEMO_CARDS[0]} />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 min-h-[180px]">
-                      <NewsCard item={DEMO_CARDS[1]} index={1} />
-                      <NewsCard item={DEMO_CARDS[2]} index={2} />
+                      <NewsCard item={DEMO_CARDS[1]} />
+                      <NewsCard item={DEMO_CARDS[2]} />
                     </div>
                   </div>
                 </div>
