@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import NewsCard, { NewsItem } from "./components/NewsCard";
 import DetailedResultCard, { CheckResult } from "./components/DetailedResultCard";
+import { Reveal } from "./components/reveal";
 
 const REQUEST_TIMEOUT_MS = 15000;
 const NETWORK_ERROR_MESSAGE =
@@ -29,12 +30,12 @@ type CheckApiErrorResponse = {
   success: false;
   error: string;
   errorCode:
-    | "invalid_input"
-    | "input_too_long"
-    | "daily_limit_reached"
-    | "quota_exceeded"
-    | "provider_unavailable"
-    | "internal_error";
+  | "invalid_input"
+  | "input_too_long"
+  | "daily_limit_reached"
+  | "quota_exceeded"
+  | "provider_unavailable"
+  | "internal_error";
   retryable: boolean;
 };
 
@@ -248,6 +249,7 @@ export default function Home() {
     setInputText(text);
     setFeedback(null);
   };
+
   const feedbackClasses =
     feedback?.tone === "warning"
       ? "border-amber-500/20 bg-amber-500/10 shadow-amber-950/20"
@@ -262,192 +264,223 @@ export default function Home() {
       : "text-red-100/70";
 
   return (
-    <div className="min-h-screen p-6 sm:p-10 font-[family-name:var(--font-geist-sans)] flex flex-col items-center">
-      <header className="w-full max-w-5xl flex items-center justify-between mb-16 sm:mb-24 mt-4 fade-in-up">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.location.reload()}>
-          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-lg shadow-lg shadow-blue-500/20">
-            R
-          </div>
-          <div>
-            <h1 className="font-bold text-2xl tracking-tight leading-none text-white/90">
-              RealNews<span className="text-blue-400">.tech</span>
-            </h1>
-            <p className="text-[11px] uppercase tracking-widest text-white/50 mt-1 font-semibold">
-              AI-assisted credibility checks
-            </p>
+    <div className="flex min-h-screen flex-col items-center">
+      <header className="container-shell sticky top-0 z-40 pt-4 pb-4">
+        <div className="surface-card flex items-center justify-between gap-4 px-4 py-3 md:px-5 cursor-pointer" onClick={() => window.location.reload()}>
+          <div className="inline-flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-[0.85rem] bg-gradient-to-tr from-blue-700 to-sky-400 text-xl font-black text-white shadow-[0_0_20px_rgba(37,99,235,0.4)]">
+              R
+            </span>
+            <div>
+              <p className="heading-display text-xl font-bold leading-none text-foreground">
+                RealNews<span className="text-[color:var(--brand-strong)]">.tech</span>
+              </p>
+              <p className="mt-1 text-[0.62rem] font-bold uppercase tracking-[0.2em] text-[color:var(--muted)]">
+                AI Fact-Checking
+              </p>
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="w-full max-w-4xl flex flex-col items-center text-center flex-grow">
+      <main className="container-shell flex-1">
         {result ? (
-          <DetailedResultCard result={result} isCached={isCached} />
+          <div className="max-w-4xl mx-auto pt-8 pb-16">
+            <DetailedResultCard result={result} isCached={isCached} />
+          </div>
         ) : (
-          <>
-            <div className="fade-in-up" style={{ animationDelay: "100ms" }}>
-              <h2 className="text-4xl sm:text-6xl font-extrabold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white via-white/90 to-white/60">
-                Check the facts. <br className="hidden sm:block" /> Ignore the noise.
-              </h2>
-              <p className="text-lg sm:text-xl text-white/60 max-w-2xl mx-auto leading-relaxed mb-10 font-medium">
-                Paste a headline, claim, or link - get a clear credibility verdict in seconds.
+          <div className="flex flex-col items-center">
+            {/* ─── HERO ─────────────────────────────────── */}
+            <section className="flex flex-col items-center justify-center text-center pt-16 pb-16 md:pt-24 md:pb-24 max-w-3xl w-full">
+              <span className="eyebrow fade-in-up">
+                AI-Assisted Credibility Checks
+              </span>
+              <h1 className="heading-display text-balance mt-6 text-5xl font-bold tracking-tight text-foreground sm:text-6xl lg:text-7xl fade-in-up" style={{ animationDelay: "100ms" }}>
+                Check the facts.
+                <br />
+                <span className="bg-gradient-to-r from-[color:var(--brand)] to-sky-400 bg-clip-text text-transparent">
+                  Ignore the noise.
+                </span>
+              </h1>
+              <p className="text-balance mt-6 max-w-2xl text-lg leading-8 text-[color:var(--muted)] sm:text-xl fade-in-up" style={{ animationDelay: "200ms" }}>
+                Paste a headline, claim, or link below and get a clear credibility verdict in seconds, powered by AI cross-referencing.
               </p>
-            </div>
 
-            <div className="w-full max-w-2xl relative group fade-in-up" style={{ animationDelay: "200ms" }}>
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-500"></div>
-              <div className="relative bg-white/5 border border-white/10 rounded-2xl p-2 flex items-center backdrop-blur-xl shadow-2xl overflow-hidden focus-within:border-blue-500/50 transition-colors">
-                <div className="pl-4 pr-2 text-white/30">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+              <div className="w-full mt-10 relative group fade-in-up" style={{ animationDelay: "300ms" }}>
+                <div className="absolute -inset-1.5 bg-gradient-to-r from-[color:var(--brand)] to-purple-500 rounded-3xl blur-md opacity-25 group-hover:opacity-40 transition duration-500"></div>
+                <div className="relative surface-card p-2 flex items-center border border-[color:var(--border)] focus-within:border-[color:var(--brand)] transition-colors">
+                  <div className="pl-5 pr-3 text-[color:var(--muted)]">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && void handleCheck()}
+                    placeholder={isLoading ? "Analyzing claim patterns..." : "Paste a headline or claim here..."}
+                    disabled={isLoading}
+                    className="w-full bg-transparent border-none text-foreground placeholder-[color:var(--muted)] text-lg py-4 focus:outline-none focus:ring-0 disabled:opacity-50"
+                  />
+                  <button
+                    onClick={() => void handleCheck()}
+                    disabled={isLoading || !inputText.trim()}
+                    className="hidden sm:flex items-center gap-2 bg-[color:var(--brand)] hover:bg-[color:var(--brand-strong)] disabled:bg-gray-800 disabled:opacity-50 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg flex-shrink-0"
+                  >
+                    {isLoading ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        Check now
+                      </>
+                    )}
+                  </button>
                 </div>
-                <input
-                  type="text"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && void handleCheck()}
-                  placeholder={isLoading ? "Analyzing claim patterns..." : "Paste a headline or claim here..."}
-                  disabled={isLoading}
-                  className="w-full bg-transparent border-none text-white placeholder-white/30 text-lg sm:text-xl py-4 focus:outline-none focus:ring-0 disabled:opacity-50"
-                />
-                <button
-                  onClick={() => void handleCheck()}
-                  disabled={isLoading || !inputText.trim()}
-                  className="hidden sm:flex bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:opacity-50 text-white font-semibold py-3 px-8 rounded-xl transition-all shadow-lg shadow-blue-500/25 items-center gap-2 flex-shrink-0"
-                >
-                  {isLoading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      Check now
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    </>
-                  )}
-                </button>
+
+                {feedback && (
+                  <div className={`mt-4 rounded-xl border px-5 py-4 text-left shadow-lg ${feedbackClasses}`}>
+                    <p className={`text-sm font-bold ${feedbackTextClasses}`}>{feedback.message}</p>
+                    {feedback.hint && (
+                      <p className={`mt-2 text-xs font-medium ${feedbackHintClasses}`}>
+                        {feedback.hint}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {feedback && (
-                <div className={`mt-4 rounded-2xl border px-4 py-3 text-left shadow-lg ${feedbackClasses}`}>
-                  <p className={`text-sm font-medium ${feedbackTextClasses}`}>{feedback.message}</p>
-                  {feedback.hint && (
-                    <p className={`mt-2 text-xs ${feedbackHintClasses}`}>
-                      {feedback.hint}
-                    </p>
-                  )}
+              <button
+                onClick={() => void handleCheck()}
+                disabled={isLoading || !inputText.trim()}
+                className="sm:hidden w-full mt-4 bg-[color:var(--brand)] hover:bg-[color:var(--brand-strong)] text-white font-bold py-4 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2 fade-in-up disabled:opacity-50"
+                style={{ animationDelay: "350ms" }}
+              >
+                {isLoading ? "Analyzing..." : "Check now"}
+              </button>
+
+              {!isLoading && (
+                <div className="w-full mt-10 fade-in-up" style={{ animationDelay: "400ms" }}>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--muted)] mb-4">
+                    Or try an example
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-3">
+                    <button
+                      onClick={() => fillExample("Coffee reverses aging")}
+                      className="text-[11px] font-semibold px-4 py-2 rounded-full border border-[color:var(--border)] bg-white/5 text-[color:var(--muted)] hover:text-foreground hover:bg-[color:var(--brand)] hover:border-transparent transition-all shadow-sm"
+                    >
+                      Coffee reverses aging
+                    </button>
+                    <button
+                      onClick={() => fillExample("Eiffel Tower moving to Dubai")}
+                      className="text-[11px] font-semibold px-4 py-2 rounded-full border border-[color:var(--border)] bg-white/5 text-[color:var(--muted)] hover:text-foreground hover:bg-[color:var(--brand)] hover:border-transparent transition-all shadow-sm"
+                    >
+                      Eiffel Tower moving to Dubai
+                    </button>
+                    <button
+                      onClick={() => fillExample("Fed cuts interest rates by 0.5%")}
+                      className="text-[11px] font-semibold px-4 py-2 rounded-full border border-[color:var(--border)] bg-white/5 text-[color:var(--muted)] hover:text-foreground hover:bg-[color:var(--brand)] hover:border-transparent transition-all shadow-sm"
+                    >
+                      Fed cuts interest rates by 0.5%
+                    </button>
+                  </div>
                 </div>
               )}
-            </div>
-
-            <button
-              onClick={() => void handleCheck()}
-              disabled={isLoading || !inputText.trim()}
-              className="sm:hidden w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-4 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2 fade-in-up disabled:opacity-50"
-              style={{ animationDelay: "300ms" }}
-            >
-              {isLoading ? "Analyzing..." : "Check now"}
-            </button>
+            </section>
 
             {!isLoading && (
-              <div className="w-full mt-8 flex flex-wrap justify-center gap-3 fade-in-up" style={{ animationDelay: "300ms" }}>
-                <span className="text-xs text-white/30 uppercase tracking-widest font-semibold w-full block mb-1">Try an example</span>
-                <button
-                  onClick={() => fillExample("Coffee reverses aging")}
-                  className="text-xs px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-                >
-                  &quot;Coffee reverses aging&quot;
-                </button>
-                <button
-                  onClick={() => fillExample("Eiffel Tower moving to Dubai")}
-                  className="text-xs px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-                >
-                  &quot;Eiffel Tower moving to Dubai&quot;
-                </button>
-                <button
-                  onClick={() => fillExample("Fed cuts interest rates by 0.5%")}
-                  className="text-xs px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-                >
-                  &quot;Fed cuts interest rates by 0.5%&quot;
-                </button>
-              </div>
+              <Reveal>
+                <div className="w-full max-w-4xl section-pad">
+                  <div className="flex items-center gap-4 mb-10">
+                    <div className="h-px bg-gradient-to-r from-transparent to-[color:var(--border)] flex-grow" />
+                    <span className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--brand-strong)] px-2">Example Results</span>
+                    <div className="h-px bg-gradient-to-l from-transparent to-[color:var(--border)] flex-grow" />
+                  </div>
+
+                  <div className="flex flex-col gap-6">
+                    <div className="w-full min-h-[180px]">
+                      <NewsCard item={DEMO_CARDS[0]} index={0} />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 min-h-[180px]">
+                      <NewsCard item={DEMO_CARDS[1]} index={1} />
+                      <NewsCard item={DEMO_CARDS[2]} index={2} />
+                    </div>
+                  </div>
+                </div>
+              </Reveal>
             )}
 
             {!isLoading && (
-              <div className="w-full mt-24 mb-12 fade-in-up text-left" style={{ animationDelay: "400ms" }}>
-                <div className="flex items-center gap-3 mb-8 pl-2">
-                  <div className="h-px bg-white/10 flex-grow" />
-                  <span className="text-xs font-semibold uppercase tracking-widest text-white/30">Example results</span>
-                  <div className="h-px bg-white/10 flex-grow" />
-                </div>
+              <Reveal delay={200}>
+                <section className="w-full max-w-4xl section-pad pt-0">
+                  <div className="surface-card-strong p-8 md:p-12 relative overflow-hidden">
+                    <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-[radial-gradient(circle_at_top_right,_rgba(37,99,235,0.1),_transparent_70%)] lg:block" />
+                    <div className="relative z-10">
+                      <span className="eyebrow mb-4">Behind the scenes</span>
+                      <h3 className="heading-display text-3xl font-bold text-foreground mb-10">How RealNews works</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                        <div>
+                          <div className="w-12 h-12 rounded-2xl bg-[color:var(--brand)] flex items-center justify-center text-white mb-5 shadow-lg shadow-blue-500/20">
+                            <span className="font-extrabold">01</span>
+                          </div>
+                          <h4 className="text-lg font-bold text-foreground mb-3">Analyze</h4>
+                          <p className="text-sm font-medium text-[color:var(--muted)] leading-relaxed">
+                            We break down the core claims of the headline or article you paste using LLM extraction.
+                          </p>
+                        </div>
+                        <div>
+                          <div className="w-12 h-12 rounded-2xl bg-purple-600 flex items-center justify-center text-white mb-5 shadow-lg shadow-purple-500/20">
+                            <span className="font-extrabold">02</span>
+                          </div>
+                          <h4 className="text-lg font-bold text-foreground mb-3">Cross-Reference</h4>
+                          <p className="text-sm font-medium text-[color:var(--muted)] leading-relaxed">
+                            Our AI agent searches trusted databases and primary sources for real-time corroboration.
+                          </p>
+                        </div>
+                        <div>
+                          <div className="w-12 h-12 rounded-2xl bg-[color:var(--accent-green)] flex items-center justify-center text-white mb-5 shadow-lg shadow-green-500/20">
+                            <span className="font-extrabold">03</span>
+                          </div>
+                          <h4 className="text-lg font-bold text-foreground mb-3">Verdict</h4>
+                          <p className="text-sm font-medium text-[color:var(--muted)] leading-relaxed">
+                            You get a clear label (Verified, Misleading, Likely false) and the exact reasoning behind it.
+                          </p>
+                        </div>
+                      </div>
 
-                <div className="flex flex-col gap-6">
-                  <div className="w-full">
-                    <NewsCard item={DEMO_CARDS[0]} index={0} />
+                      <div className="mt-10 pt-8 border-t border-[color:var(--border)] flex items-start gap-4">
+                        <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                          <h4 className="text-sm font-bold text-[color:var(--muted)]">AI-assisted analysis</h4>
+                          <p className="text-xs font-medium text-[color:var(--muted)] mt-1.5 leading-relaxed">
+                            Our AI provides a preliminary check. AI can occasionally miss recent context. Always verify important claims yourself.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <NewsCard item={DEMO_CARDS[1]} index={1} />
-                    <NewsCard item={DEMO_CARDS[2]} index={2} />
-                  </div>
-                </div>
-              </div>
+                </section>
+              </Reveal>
             )}
-
-            {!isLoading && (
-              <section className="w-full max-w-4xl mt-16 p-8 rounded-3xl bg-white/[0.02] border border-white/5 fade-in-up" style={{ animationDelay: "500ms" }}>
-                <h3 className="text-lg font-bold text-white/80 mb-6">How RealNews works</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 text-left">
-                  <div>
-                    <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 mb-4 mx-auto sm:mx-0">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-                    <h4 className="text-sm font-semibold text-white/90 mb-2">1. Analyze</h4>
-                    <p className="text-xs text-white/50 leading-relaxed">We break down the core claims of the headline or article you paste.</p>
-                  </div>
-                  <div>
-                    <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400 mb-4 mx-auto sm:mx-0">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                      </svg>
-                    </div>
-                    <h4 className="text-sm font-semibold text-white/90 mb-2">2. Cross-Reference</h4>
-                    <p className="text-xs text-white/50 leading-relaxed">Our AI agent searches trusted databases and primary sources for corroboration.</p>
-                  </div>
-                  <div>
-                    <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-4 mx-auto sm:mx-0">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <h4 className="text-sm font-semibold text-white/90 mb-2">3. Verdict</h4>
-                    <p className="text-xs text-white/50 leading-relaxed">You get a clear label (Verified, Misleading, Likely false) and the reasoning behind it.</p>
-                  </div>
-                </div>
-
-                <div className="mt-8 pt-6 border-t border-white/5 flex items-start gap-4 text-left bg-yellow-500/5 p-4 rounded-xl border-l-4 border-l-yellow-500/50">
-                  <svg className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <div>
-                    <h4 className="text-sm font-semibold text-white/80">AI-assisted analysis</h4>
-                    <p className="text-xs text-white/50 mt-1 leading-relaxed">
-                      Our AI system provides a preliminary credibility check. Artificial Intelligence can occasionally hallucinate or miss recent context. Always verify important claims with multiple primary sources yourself.
-                    </p>
-                  </div>
-                </div>
-              </section>
-            )}
-          </>
+          </div>
         )}
       </main>
 
-      <footer className="mt-20 border-t border-white/5 pt-8 text-center pb-8 w-full max-w-5xl">
-        <p className="text-xs text-white/30">
-          RealNews.tech &copy; {new Date().getFullYear()} - Preliminary AI Claim Check
-        </p>
+      <footer className="container-shell pb-8">
+        <div className="surface-card px-6 py-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-[0.6rem] bg-gradient-to-tr from-blue-700 to-sky-400 text-sm font-black text-white">
+              R
+            </span>
+            <span className="text-sm font-bold text-foreground">RealNews.tech</span>
+          </div>
+          <p className="text-xs font-medium text-[color:var(--muted)]">
+            &copy; {new Date().getFullYear()} – Preliminary AI Claim Check
+          </p>
+        </div>
       </footer>
     </div>
   );

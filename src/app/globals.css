@@ -1,16 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --background: #06080d;
-  --foreground: #e8eaf0;
-  --card-bg: rgba(17, 21, 32, 0.7);
-  --card-border: rgba(255, 255, 255, 0.06);
+  --background: #02040a;
+  --foreground: #f8fafc;
+  --brand: #2563eb;
+  --brand-strong: #1da1f2;
+  --muted: #94a3b8;
+  --border: rgba(255, 255, 255, 0.08);
+  --blue-soft: rgba(37, 99, 235, 0.12);
+  --card-bg: rgba(9, 13, 24, 0.65);
+  --card-bg-strong: rgba(13, 17, 30, 0.85);
+
   --accent-green: #22c55e;
   --accent-red: #ef4444;
   --accent-yellow: #f59e0b;
   --accent-blue: #3b82f6;
-  --glass-bg: rgba(255, 255, 255, 0.03);
-  --glass-border: rgba(255, 255, 255, 0.08);
 }
 
 @theme inline {
@@ -27,48 +31,80 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+  font-family: var(--font-sans, "Inter", system-ui, sans-serif);
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Animated gradient background */
-.bg-mesh {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background:
-    radial-gradient(ellipse 80% 50% at 20% 40%, rgba(59, 130, 246, 0.08), transparent),
-    radial-gradient(ellipse 60% 60% at 80% 20%, rgba(139, 92, 246, 0.06), transparent),
-    radial-gradient(ellipse 50% 40% at 50% 80%, rgba(34, 197, 94, 0.04), transparent);
-  pointer-events: none;
+/* Typography elements */
+.heading-display {
+  letter-spacing: -0.04em;
 }
 
-/* Glassmorphism card */
-.glass-card {
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  background: var(--blue-soft);
+  padding: 0.35rem 0.85rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--brand-strong);
+  border: 1px solid rgba(29, 161, 242, 0.15);
+}
+
+/* Layout */
+.container-shell {
+  width: 100%;
+  max-width: 80rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.section-pad {
+  padding-top: 5rem;
+  padding-bottom: 5rem;
+}
+
+/* Cards */
+.surface-card {
   background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 16px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 1.5rem;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.glass-card:hover {
-  border-color: rgba(255, 255, 255, 0.12);
+.surface-card:hover {
+  border-color: rgba(255, 255, 255, 0.14);
   transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 12px 40px -12px rgba(37, 99, 235, 0.12);
 }
 
-/* Fact check badges */
+.surface-card-strong {
+  background: var(--card-bg-strong);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border-radius: 2rem;
+}
+
+/* Badge/Pills */
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
   border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.025em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
@@ -96,11 +132,84 @@ body {
   border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
-/* Confidence bar */
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.5); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  opacity: 0;
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+  opacity: 0;
+}
+
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: all 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Background blob effects */
+.bg-mesh {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 0%, rgba(37, 99, 235, 0.15), transparent),
+    radial-gradient(ellipse 60% 60% at 80% 100%, rgba(139, 92, 246, 0.12), transparent);
+  pointer-events: none;
+}
+
+/* Utilities */
 .confidence-bar {
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 
@@ -110,40 +219,6 @@ body {
   transition: width 1s ease-out;
 }
 
-/* Pulse animation for live indicator */
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(1.5); }
-}
-
-.pulse-dot {
-  animation: pulse-dot 2s ease-in-out infinite;
-}
-
-/* Shimmer loading effect */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-.shimmer {
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
-  background-size: 200% 100%;
-  animation: shimmer 2s infinite;
-}
-
-/* Fade in animation */
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.fade-in-up {
-  animation: fadeInUp 0.5s ease-out forwards;
-  opacity: 0;
-}
-
-/* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -153,10 +228,10 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.25);
 }

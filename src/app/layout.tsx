@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className={`${inter.variable} antialiased`}>
+      <body className={`${inter.variable} antialiased selection:bg-blue-500/30`}>
         <div className="bg-mesh" />
         <div className="relative z-10">{children}</div>
       </body>
