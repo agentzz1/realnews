@@ -1,8 +1,13 @@
 from PIL import Image, ImageOps
 import sys
+import os
 
-input_path = r"C:\Users\maogo\Downloads\fiverr_discord_bot_thumbnail_v2_1772920457498.png"
-output_path = r"C:\Users\maogo\Downloads\fiverr_discord_bot_thumbnail_1280x769.png"
+input_path = "./public/original_thumbnail.png"
+output_path = "./docs/realnews-home.png"
+
+if not os.path.exists(input_path):
+    print(f"INFO: Place your raw screenshot at {input_path} to resize it.")
+    sys.exit(0)
 
 try:
     with Image.open(input_path) as img:
